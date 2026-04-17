@@ -284,7 +284,8 @@ select{min-width:200px}
 <div class="page active" id="page0"></div>
 <div class="page" id="page1">
 <div class="filters">
-<label>Plant + Mix:</label><select id="selPM" onchange="updateTrend()"></select>
+<label>Plant:</label><select id="selPlant" onchange="updateMixDropdown();updateTrend()"></select>
+<label>Mix:</label><select id="selMix" onchange="updateTrend()"></select>
 <div class="date-range">
 <label>From:</label><input type="date" id="dateFrom" onchange="updateTrend()">
 <label>To:</label><input type="date" id="dateTo" onchange="updateTrend()">
@@ -494,15 +495,32 @@ function buildOverview(){
 // ========== PAGE 1: TRENDS ==========
 let trendChartObj=null;
 function resetDates(){document.getElementById('dateFrom').value='';document.getElementById('dateTo').value='';updateTrend()}
+function getUniquePlants(){return[...new Set(trackedPMs.map(k=>k.split('|')[0]))].sort()}
+function getMixesForPlant(p){return trackedPMs.filter(k=>k.split('|')[0]===p).map(k=>k.split('|')[1]).sort()}
+function updateMixDropdown(){
+    const p=document.getElementById('selPlant').value;
+    const selMix=document.getElementById('selMix');
+    const prev=selMix.value;
+    selMix.innerHTML='';
+    getMixesForPlant(p).forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;selMix.appendChild(o)});
+    if(getMixesForPlant(p).includes(prev))selMix.value=prev;
+}
 function initTrendPage(){
-    const sel=document.getElementById('selPM');trackedPMs.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sel.appendChild(o)});
-    try{const sv=localStorage.getItem('qc_pm');if(sv&&trackedPMs.includes(sv))sel.value=sv;const df=localStorage.getItem('qc_df');if(df)document.getElementById('dateFrom').value=df;const dt=localStorage.getItem('qc_dt');if(dt)document.getElementById('dateTo').value=dt}catch(e){}
+    const selPlant=document.getElementById('selPlant');
+    getUniquePlants().forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;selPlant.appendChild(o)});
+    try{
+        const sp=localStorage.getItem('qc_plant');if(sp&&getUniquePlants().includes(sp))selPlant.value=sp;
+        updateMixDropdown();
+        const sm=localStorage.getItem('qc_mix');if(sm&&getMixesForPlant(selPlant.value).includes(sm))document.getElementById('selMix').value=sm;
+        const df=localStorage.getItem('qc_df');if(df)document.getElementById('dateFrom').value=df;
+        const dt=localStorage.getItem('qc_dt');if(dt)document.getElementById('dateTo').value=dt;
+    }catch(e){updateMixDropdown();}
     updateTrend();
 }
 function updateTrend(){
-    const k=document.getElementById('selPM').value;if(!k)return;
-    try{localStorage.setItem('qc_pm',k);localStorage.setItem('qc_df',document.getElementById('dateFrom').value);localStorage.setItem('qc_dt',document.getElementById('dateTo').value)}catch(e){}
-    const [p,m]=k.split('|');const df=document.getElementById('dateFrom').value,dt=document.getElementById('dateTo').value;
+    const p=document.getElementById('selPlant').value,m=document.getElementById('selMix').value;if(!p||!m)return;
+    try{localStorage.setItem('qc_plant',p);localStorage.setItem('qc_mix',m);localStorage.setItem('qc_df',document.getElementById('dateFrom').value);localStorage.setItem('qc_dt',document.getElementById('dateTo').value)}catch(e){}
+    const df=document.getElementById('dateFrom').value,dt=document.getElementById('dateTo').value;
     let allRows=D.filter(r=>r[F.PLANT]===p&&r[F.MIX]===m).sort((a,b)=>(a[F.DATE]||'').localeCompare(b[F.DATE]||''));
     if(df)allRows=allRows.filter(r=>r[F.DATE]>=df);if(dt)allRows=allRows.filter(r=>r[F.DATE]<=dt);
     allRows=allRows.filter(r=>r[F.AVG7]!=null||r[F.AVG28]!=null);
@@ -915,8 +933,9 @@ function rebuildAll(){
     // Rebuild all pages
     if(trendChartObj){trendChartObj.destroy();trendChartObj=null}
     buildOverview();
-    const sel=document.getElementById('selPM');sel.innerHTML='';
-    trackedPMs.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=k;sel.appendChild(o)});
+    const selPlant=document.getElementById('selPlant');selPlant.innerHTML='';
+    getUniquePlants().forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;selPlant.appendChild(o)});
+    updateMixDropdown();
     updateTrend();
     failData=[];buildFailTable();
     buildPrediction();
